@@ -9342,13 +9342,13 @@ function run() {
             };
             core.info(`Cherry pick into branch ${inputs.branch}!`);
             const githubSha = process.env.GITHUB_SHA;
-            const prBranch = inputs.cherryPickBranch
-                ? inputs.cherryPickBranch
-                : `cherry-pick-${inputs.branch}-${githubSha}`;
             // Configure the committer and author
             core.startGroup('Configuring the committer and author');
             const parsedAuthor = utils.parseDisplayNameEmail(inputs.author);
             const parsedCommitter = utils.parseDisplayNameEmail(inputs.committer);
+            const prBranch = inputs.cherryPickBranch
+                ? inputs.cherryPickBranch
+                : `${parsedAuthor.name}/${inputs.branch}-${githubSha}`;
             core.info(`Configured git committer as '${parsedCommitter.name} <${parsedCommitter.email}>'`);
             yield gitExecution(['config', '--global', 'user.name', parsedAuthor.name]);
             yield gitExecution([
@@ -9369,19 +9369,21 @@ function run() {
             core.endGroup();
             // Cherry pick
             core.startGroup('Cherry picking');
-            yield gitExecution([
-                'cherry-pick',
-                '-m',
-                '1',
-                '--strategy=recursive',
-                '--strategy-option=theirs',
-                'b1913c6a175976282d78a45dfcfd755df8a8906f',
-                // `${githubSha}`,
-                `|| true`
-            ]);
+            try {
+                yield gitExecution([
+                    'cherry-pick',
+                    '-m',
+                    '1',
+                    '--strategy=recursive',
+                    '--strategy-option=theirs',
+                    `${githubSha}`,
+                ]);
+            } catch (err) {
+                // Do nothing
+            }
             // Take whatever is suggested by git if there are conflicts
             yield gitExecution(['add', '.'])
-            yield gitExecution(['commit'])
+            yield gitExecution(['commit', "--no-edit"])
             core.endGroup();
             // Push new branch
             core.startGroup('Push new branch to remote');
